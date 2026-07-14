@@ -1,16 +1,42 @@
-import React, { useState } from "react";
-import { RevenueSummary } from "./RevenueSummary";
+import React, { useEffect, useState } from 'react';
+import { SecureAPI, type DashboardProperty } from '../lib/secureApi';
+import { RevenueSummary } from './RevenueSummary';
 
-const PROPERTIES = [
-  { id: 'prop-001', name: 'Beach House Alpha' },
-  { id: 'prop-002', name: 'City Apartment Downtown' },
-  { id: 'prop-003', name: 'Country Villa Estate' },
-  { id: 'prop-004', name: 'Lakeside Cottage' },
-  { id: 'prop-005', name: 'Urban Loft Modern' }
-];
+const DEFAULT_REPORT_YEAR = 2024;
+const DEFAULT_REPORT_MONTH = 3;
 
 const Dashboard: React.FC = () => {
-  const [selectedProperty, setSelectedProperty] = useState('prop-001');
+  const [properties, setProperties] = useState<DashboardProperty[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState('');
+  const [propertiesLoading, setPropertiesLoading] = useState(true);
+  const [propertiesError, setPropertiesError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProperties = async () => {
+      try {
+        const response = await SecureAPI.getDashboardProperties();
+        if (cancelled) return;
+
+        setProperties(response.properties);
+        setSelectedProperty(response.properties[0]?.id ?? '');
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(error);
+        setPropertiesError('Failed to load properties');
+      } finally {
+        if (!cancelled) setPropertiesLoading(false);
+      }
+    };
+
+    void loadProperties();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="p-4 lg:p-6 min-h-full">
@@ -23,19 +49,26 @@ const Dashboard: React.FC = () => {
               <div>
                 <h2 className="text-lg lg:text-xl font-medium text-gray-900 mb-2">Revenue Overview</h2>
                 <p className="text-sm lg:text-base text-gray-600">
-                  Monthly performance insights for your properties
+                  March 2024 performance insights for your properties
                 </p>
               </div>
-              
-              {/* Property Selector */}
+
               <div className="flex flex-col sm:items-end">
-                <label className="text-xs font-medium text-gray-700 mb-1">Select Property</label>
+                <label htmlFor="dashboard-property" className="text-xs font-medium text-gray-700">
+                  Select Property
+                </label>
                 <select
+                  id="dashboard-property"
                   value={selectedProperty}
-                  onChange={(e) => setSelectedProperty(e.target.value)}
+                  onChange={(event) => setSelectedProperty(event.target.value)}
+                  disabled={propertiesLoading || properties.length === 0}
                   className="block w-full sm:w-auto min-w-[200px] px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                 >
-                  {PROPERTIES.map((property) => (
+                  {propertiesLoading ? <option value="">Loading properties...</option> : null}
+                  {!propertiesLoading && properties.length === 0 ? (
+                    <option value="">No properties available</option>
+                  ) : null}
+                  {properties.map((property) => (
                     <option key={property.id} value={property.id}>
                       {property.name}
                     </option>
@@ -46,7 +79,15 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            <RevenueSummary propertyId={selectedProperty} />
+            {propertiesError ? (
+              <div className="p-4 text-red-500 bg-red-50 rounded-lg">{propertiesError}</div>
+            ) : selectedProperty ? (
+              <RevenueSummary
+                propertyId={selectedProperty}
+                year={DEFAULT_REPORT_YEAR}
+                month={DEFAULT_REPORT_MONTH}
+              />
+            ) : null}
           </div>
         </div>
       </div>

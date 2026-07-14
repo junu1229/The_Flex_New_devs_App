@@ -13,6 +13,26 @@ import { supabase } from './supabase';
 import { sessionManager } from '../utils/sessionManager';
 import { withRetry, handleApiError, classifyError } from '../utils/apiErrorHandler';
 
+export interface DashboardProperty {
+  id: string;
+  name: string;
+  timezone: string;
+}
+
+export interface DashboardPropertiesResponse {
+  properties: DashboardProperty[];
+}
+
+export interface DashboardSummaryResponse {
+  property_id: string;
+  year: number;
+  month: number;
+  property_timezone: string;
+  total_revenue: string;
+  currency: string;
+  reservations_count: number;
+}
+
 // Get backend URL with fallback for misconfigured production environments
 const getBackendUrl = () => {
   // For production/staging (non-localhost), use relative URLs to avoid CORS
@@ -1449,23 +1469,22 @@ export class SecureAPIClient {
   }
 
   // ============= DASHBOARD API =============
-  /**
-   * Get dashboard summary with optional simulation header
-   */
-  async getDashboardSummary(propertyId: string, options?: { simulatedTenant?: string, timestamp?: number }) {
-    const queryParams = new URLSearchParams({ property_id: propertyId });
-    if (options?.timestamp) {
-      queryParams.append('_t', options.timestamp.toString());
-    }
+  async getDashboardProperties(): Promise<DashboardPropertiesResponse> {
+    return this.request<DashboardPropertiesResponse>('/api/v1/dashboard/properties');
+  }
 
-    const requestOptions: RequestInit = {};
-    if (options?.simulatedTenant) {
-      requestOptions.headers = {
-        'X-Simulated-Tenant': options.simulatedTenant
-      };
-    }
+  async getDashboardSummary(
+    propertyId: string,
+    year: number,
+    month: number
+  ): Promise<DashboardSummaryResponse> {
+    const queryParams = new URLSearchParams({
+      property_id: propertyId,
+      year: year.toString(),
+      month: month.toString()
+    });
 
-    return this.request<any>(`/api/v1/dashboard/summary?${queryParams}`, requestOptions);
+    return this.request<DashboardSummaryResponse>(`/api/v1/dashboard/summary?${queryParams.toString()}`);
   }
 
   async uploadCompanyLogo(logo_url: string) {
